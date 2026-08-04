@@ -1,0 +1,6 @@
+{
+  "name": "موقع المنى | El-Mona",
+  "description": "تطبيق موقع المنى للتركيز وحظر التطبيقات وبناء أرض الإنجازات التفاعلية العائلية.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
