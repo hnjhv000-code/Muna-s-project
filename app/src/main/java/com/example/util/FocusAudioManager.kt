@@ -6,6 +6,9 @@ import android.media.AudioFormat
 import android.media.AudioTrack
 import android.media.MediaPlayer
 import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -31,8 +34,28 @@ object FocusAudioManager {
     private var currentPlaylist: List<Uri> = emptyList()
     private var currentPlaylistIndex: Int = 0
 
+    var currentTrack by mutableStateOf(AmbientTrack.NONE)
+        private set
+
+    var isMuted by mutableStateOf(false)
+        private set
+
+    fun toggleMute() {
+        isMuted = !isMuted
+        val volume = if (isMuted) 0f else 1f
+        try {
+            audioTrack?.setVolume(volume)
+        } catch (e: Exception) { }
+
+        try {
+            mediaPlayer?.setVolume(volume, volume)
+        } catch (e: Exception) { }
+    }
+
     fun startTrack(context: Context? = null, track: AmbientTrack, customUri: Uri? = null, customPlaylist: List<Uri> = emptyList()) {
         stopTrack()
+        currentTrack = track
+        isMuted = false
         if (track == AmbientTrack.NONE) return
 
         val playlistToPlay = if (customPlaylist.isNotEmpty()) customPlaylist else if (customUri != null) listOf(customUri) else emptyList()
@@ -71,6 +94,8 @@ object FocusAudioManager {
                 .build()
 
             audioTrack?.play()
+            val initialVol = if (isMuted) 0f else 1f
+            audioTrack?.setVolume(initialVol)
 
             val buffer = ShortArray(1024)
             var phase = 0.0
@@ -80,14 +105,12 @@ object FocusAudioManager {
                 for (i in buffer.indices) {
                     when (track) {
                         AmbientTrack.RAIN -> {
-                            // Rain noise with soft low-pass filter and random pitter-patter drops
                             val noise = (Random.nextFloat() * 2f - 1f) * 0.15f
                             val drop = if (Random.nextFloat() > 0.998f) 0.5f else 0.0f
                             val sample = (noise + drop).coerceIn(-1.0f, 1.0f)
                             buffer[i] = (sample * 8000).toInt().toShort()
                         }
                         AmbientTrack.MELODY -> {
-                            // Ambient Pentatonic chord generator (soft sine wave combination)
                             val f1 = 220.0 // A3
                             val f2 = 277.18 // C#4
                             val f3 = 329.63 // E4
@@ -101,8 +124,7 @@ object FocusAudioManager {
                             buffer[i] = (total * 32767).toInt().toShort()
                         }
                         AmbientTrack.WAVES -> {
-                            // Ocean tide breathing swell
-                            wavePhase += 2.0 * Math.PI / (sampleRate * 6.0) // 6 second swell cycle
+                            wavePhase += 2.0 * Math.PI / (sampleRate * 6.0)
                             val swell = (sin(wavePhase) + 1.0) * 0.5
                             val noise = (Random.nextFloat() * 2f - 1f) * swell * 0.25f
                             buffer[i] = (noise * 16000).toInt().toShort()
@@ -121,7 +143,7 @@ object FocusAudioManager {
         stopTrack()
         playbackJob = scope.launch {
             val sampleRate = 22050
-            val frequencies = listOf(523.25, 659.25, 783.99, 1046.50) // C5, E5, G5, C6
+            val frequencies = listOf(523.25, 659.25, 783.99, 1046.50)
             val noteDurationMs = 250
             val noteSamples = (sampleRate * noteDurationMs) / 1000
 
@@ -151,7 +173,7 @@ object FocusAudioManager {
                 var phase = 0.0
                 for (i in buffer.indices) {
                     phase += 2.0 * Math.PI * freq / sampleRate
-                    val env = (1.0 - i.toDouble() / noteSamples) // Fade out
+                    val env = (1.0 - i.toDouble() / noteSamples)
                     val sample = sin(phase) * env * 0.4
                     buffer[i] = (sample * 32767).toInt().toShort()
                 }
@@ -195,9 +217,8 @@ object FocusAudioManager {
             var phase = 0.0
             for (i in buffer.indices) {
                 val progress = i.toDouble() / totalSamples
-                val freq = 220.0 * (1.0 - progress * 0.6) // 220Hz down to 88Hz
+                val freq = 220.0 * (1.0 - progress * 0.6)
                 phase += 2.0 * Math.PI * freq / sampleRate
-                // Add squareish overtone for buzzing warning feel
                 val val1 = sin(phase)
                 val val2 = if (val1 > 0) 0.2 else -0.2
                 val env = 1.0 - progress
@@ -239,6 +260,8 @@ object FocusAudioManager {
                     }
                 }
                 prepare()
+                val vol = if (isMuted) 0f else 1f
+                setVolume(vol, vol)
                 start()
             }
         } catch (e: Exception) {
@@ -258,19 +281,17 @@ object FocusAudioManager {
         try {
             audioTrack?.stop()
             audioTrack?.release()
-        } catch (e: Exception) {
-            // Ignore cleanup exceptions
-        }
+        } catch (e: Exception) { }
         audioTrack = null
 
         try {
             mediaPlayer?.stop()
             mediaPlayer?.release()
-        } catch (e: Exception) {
-            // Ignore cleanup exceptions
-        }
+        } catch (e: Exception) { }
         mediaPlayer = null
         currentPlaylist = emptyList()
         currentPlaylistIndex = 0
+        currentTrack = AmbientTrack.NONE
     }
 }
+

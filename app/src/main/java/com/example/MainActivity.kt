@@ -1,7 +1,9 @@
 package com.example
 
+import android.app.Activity
 import android.net.Uri
 import android.os.Bundle
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import com.example.ui.screens.CustomAudioTrack
@@ -110,6 +112,7 @@ fun MainAppStructure(
     onToggleTheme: () -> Unit
 ) {
     val context = LocalContext.current
+    val activity = context as? Activity
     val scope = rememberCoroutineScope()
 
     var selectedTab by remember { mutableIntStateOf(1) } // 0: Apps, 1: Focus, 2: Land
@@ -134,6 +137,26 @@ fun MainAppStructure(
     var totalSeconds by remember { mutableLongStateOf(600L) }
     var remainingSeconds by remember { mutableLongStateOf(600L) }
     var isCollapsing by remember { mutableStateOf(false) }
+
+    // Keep screen on and display over lock screen when session is active
+    DisposableEffect(isSessionActive) {
+        if (isSessionActive && activity != null) {
+            activity.setShowWhenLocked(true)
+            activity.setTurnScreenOn(true)
+            activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else if (activity != null) {
+            activity.setShowWhenLocked(false)
+            activity.setTurnScreenOn(false)
+            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            if (activity != null) {
+                activity.setShowWhenLocked(false)
+                activity.setTurnScreenOn(false)
+                activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+        }
+    }
 
     // Block Back Button navigation during active session if Strict Mode is ON
     BackHandler(enabled = isSessionActive && isStrictMode) {
@@ -253,7 +276,7 @@ fun MainAppStructure(
                 // Tab 0: Apps Scanner
                 NavigationBarItem(
                     selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
+                    onClick = { if (!isSessionActive || !isStrictMode) selectedTab = 0 },
                     icon = {
                         if (selectedApps.isNotEmpty() || lockEntirePhone) {
                             BadgedBox(badge = {
@@ -291,7 +314,7 @@ fun MainAppStructure(
                 // Tab 2: Achievements Land
                 NavigationBarItem(
                     selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
+                    onClick = { if (!isSessionActive || !isStrictMode) selectedTab = 2 },
                     icon = {
                         if (achievements.isNotEmpty()) {
                             BadgedBox(badge = {
@@ -337,6 +360,7 @@ fun MainAppStructure(
                             totalSeconds = totalSeconds,
                             isCollapsing = isCollapsing,
                             strictMode = isStrictMode,
+                            customAudioName = customAudioName,
                             onStopSession = {
                                 if (isStrictMode) {
                                     Toast.makeText(
@@ -415,3 +439,4 @@ fun MainAppStructure(
         }
     }
 }
+

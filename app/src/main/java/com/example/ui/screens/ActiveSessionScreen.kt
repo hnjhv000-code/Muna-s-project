@@ -10,17 +10,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,6 +40,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.GrowingCanvas
+import com.example.util.AmbientTrack
+import com.example.util.FocusAudioManager
 import com.example.util.LanguageManager
 
 @Composable
@@ -44,6 +52,7 @@ fun ActiveSessionScreen(
     totalSeconds: Long,
     isCollapsing: Boolean,
     strictMode: Boolean,
+    customAudioName: String?,
     onStopSession: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -61,7 +70,7 @@ fun ActiveSessionScreen(
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Status & Timer Header Card
+        // 1. Countdown Timer Card (واجهة العد التنازلي)
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -72,7 +81,7 @@ fun ActiveSessionScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(14.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
@@ -81,7 +90,7 @@ fun ActiveSessionScreen(
                     color = MaterialTheme.colorScheme.primary
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
                     text = String.format("%02d : %02d : %02d", hours, minutes, seconds),
@@ -90,7 +99,7 @@ fun ActiveSessionScreen(
                     modifier = Modifier.testTag("active_timer_text")
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 LinearProgressIndicator(
                     progress = { progress },
@@ -113,9 +122,69 @@ fun ActiveSessionScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // Animated Growing 3D Canvas
+        // 2. Music & Sound Controller Bar (الأغاني / التحكم بالصوت)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = "Music",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    val trackTitle = when (FocusAudioManager.currentTrack) {
+                        AmbientTrack.NONE -> LanguageManager.getString("music_none")
+                        AmbientTrack.RAIN -> LanguageManager.getString("music_rain")
+                        AmbientTrack.MELODY -> LanguageManager.getString("music_melody")
+                        AmbientTrack.WAVES -> LanguageManager.getString("music_waves")
+                        AmbientTrack.CUSTOM -> customAudioName ?: LanguageManager.getString("music_custom")
+                    }
+                    Text(
+                        text = trackTitle,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+
+                if (FocusAudioManager.currentTrack != AmbientTrack.NONE) {
+                    IconButton(
+                        onClick = { FocusAudioManager.toggleMute() },
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = if (FocusAudioManager.isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                            contentDescription = "Mute Toggle",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // 3. Growing 3D Canvas (الشيء الذي ينمو)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -131,62 +200,62 @@ fun ActiveSessionScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // Warning Notice
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (strictMode) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
-            )
-        ) {
-            Row(
+        // 4. Strict Mode Lock Status OR Normal Stop Button (زر الإيقاف أن كان عادي أو لا يظهر أن كان صارم)
+        if (strictMode) {
+            // In Strict Mode: Hide Stop/Interrupt button completely as requested!
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = "Strict Lock",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = LanguageManager.getString("strict_mode_active_warning"),
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+        } else {
+            // Normal Mode: Show Stop / Interrupt Button (زر الإيقاف أو المقاطعة)
+            Button(
+                onClick = onStopSession,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .height(52.dp)
+                    .testTag("stop_session_button"),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
             ) {
                 Icon(
-                    imageVector = if (strictMode) Icons.Default.Lock else Icons.Default.Warning,
-                    contentDescription = "Warning",
-                    tint = MaterialTheme.colorScheme.error
+                    imageVector = Icons.Default.Stop,
+                    contentDescription = "Stop"
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (strictMode) LanguageManager.getString("strict_mode_active_warning") else LanguageManager.getString("warning_wither"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    fontWeight = if (strictMode) FontWeight.Bold else FontWeight.Normal
+                    text = LanguageManager.getString("stop_focus"),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                 )
             }
         }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Stop / Interrupt Button (Disabled when Strict Mode is Active)
-        Button(
-            onClick = onStopSession,
-            enabled = !strictMode,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .testTag("stop_session_button"),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.error,
-                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Icon(
-                imageVector = if (strictMode) Icons.Default.Lock else Icons.Default.Stop,
-                contentDescription = "Stop"
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = if (strictMode) LanguageManager.getString("strict_mode") else LanguageManager.getString("stop_focus"),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-            )
-        }
     }
 }
+
